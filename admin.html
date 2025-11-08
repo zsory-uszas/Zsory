@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Úszóverseny Eredménykövető - Firebase</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <style>
+        :root {
+            --gold: #FFD700;
+            --silver: #C0C0C0;
+            --bronze: #CD7F32;
+            --background: #f0f8ff;
+            --card-bg: #ffffff;
+            --text: #333333;
+            --accent: #1e90ff;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --event: #6f42c1;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e90ff 0%, #00bfff 100%);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 968px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 20px rgba(0, 0, 0, 0.15);
+        }
+        
+        h1 {
+            color: white;
+            text-align: center;
+            margin-bottom: 25px;
+            font-size: 2.5rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        h2 {
+            color: var(--accent);
+            margin-bottom: 15px;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 8px;
+        }
+        
+        h3 {
+            color: var(--event);
+            margin: 15px 0 10px 0;
+        }
+        
+        .input-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        select, input, button {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(30, 144, 255, 0.2);
+        }
+        
+        button {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background-color: #0a7bd6;
+            transform: translateY(-2px);
+        }
+        
+        button.success {
+            background-color: var(--success);
+        }
+        
+        button.success:hover {
+            background-color: #218838;
+        }
+        
+        button.warning {
+            background-color: var(--warning);
+            color: #212529;
+        }
+        
+        button.warning:hover {
+            background-color: #e0a800;
+        }
+        
+        button.danger {
+            background-color: var(--danger);
+        }
+        
+        button.danger:hover {
+            background-color: #c82333;
+        }
+        
+        button.event {
+            background-color: var(--event);
+        }
+        
+        button.event:hover {
+            background-color: #5a3596;
+        }
+        
+        .results-list {
+            max-height: 700px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .swimmer-item {
+            margin-bottom: 20px;
+            border-left: 5px solid var(--accent);
+            padding: 15px;
+            background: white;
+            border-radius: 0 10px 10px 0;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        
+        .swimmer-item:hover {
+            transform: translateX(5px);
+        }
+        
+        .swimmer-name {
+            font-weight: bold;
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+        }
+        
+        .swimmer-name::before {
+            content: "🏊";
+            margin-right: 10px;
+            font-size: 24px;
+        }
+        
+        .event-group {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .event-name {
+            font-weight: bold;
+            color: var(--event);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .event-name::before {
+            content: "🏅";
+            margin-right: 8px;
+        }
+        
+        .placement-list {
+            margin-left: 20px;
+        }
+        
+        .placement-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 5px;
+            border-left: 3px solid var(--accent);
+        }
+        
+        .medal {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 12px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            flex-shrink: 0;
+        }
+        
+        .gold {
+            background: linear-gradient(135deg, var(--gold) 0%, #ffec8b 100%);
+        }
+        
+        .silver {
+            background: linear-gradient(135deg, var(--silver) 0%, #e8e8e8 100%);
+        }
+        
+        .bronze {
+            background: linear-gradient(135deg, var(--bronze) 0%, #e9b376 100%);
+        }
+        
+        .other {
+            background: linear-gradient(135deg, #ddd 0%, #f0f0f0 100%);
+        }
+        
+        .placement-text {
+            font-size: 16px;
+            font-weight: 500;
+            flex-grow: 1;
+        }
+        
+        .event-text {
+            font-size: 14px;
+            color: #666;
+            font-style: italic;
+            margin-left: 10px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .stat-item {
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            flex: 1;
+            margin: 0 5px;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--accent);
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+            font-weight: bold;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .status.connected {
+            background-color: rgba(40, 167, 69, 0.2);
+            color: var(--success);
+            border: 1px solid rgba(40, 167, 69, 0.3);
+        }
+        
+        .status.disconnected {
+            background-color: rgba(220, 53, 69, 0.2);
+            color: var(--danger);
+            border: 1px solid rgba(220, 53, 69, 0.3);
+        }
+        
+        .swimmer-management {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .event-management {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 30px;
+            font-style: italic;
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state i {
+            font-size: 64px;
+            margin-bottom: 15px;
+            display: block;
+            color: #ccc;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            display: flex;
+            align-items: center;
+        }
+        
+        .logo::before {
+            content: "🏆";
+            margin-right: 10px;
+            font-size: 32px;
+        }
+        
+        .last-updated {
+            color: white;
+            font-size: 14px;
+            text-align: right;
+        }
+        
+        /* Görgetősáv stílusok */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0a7bd6;
+        }
+        
+        .event-badge {
+            display: inline-block;
+            background: var(--event);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        
+        .delete-placement {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 16px;
+            margin-left: 10px;
+            width: auto;
+            padding: 0;
+        }
+        
+        .delete-placement:hover {
+            color: var(--danger);
+            transform: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Úszóverseny Eredménykövető</div>
+        <div class="last-updated" id="last-updated">Utolsó frissítés: -</div>
+    </div>
+    
+    <div class="container">
+        <div class="input-section">
+            <div class="card">
+                <h2>Helyezés rögzítése</h2>
+                <div class="form-group">
+                    <label for="swimmer-select">Úszó kiválasztása:</label>
+                    <select id="swimmer-select">
+                        <option value="">-- Válassz úszót --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="event-select">Versenyszám:</label>
+                    <select id="event-select">
+                        <option value="">-- Válassz versenyszámot --</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="placement-input">Helyezés:</label>
+                    <input type="number" id="placement-input" min="1" max="20" placeholder="Helyezés (1-20)">
+                </div>
+                
+                <button id="add-placement">Hozzáadás</button>
+                
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-swimmers">0</div>
+                        <div class="stat-label">Összes úszó</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="total-placements">0</div>
+                        <div class="stat-label">Összes helyezés</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Úszók kezelése</h2>
+                <div class="swimmer-management">
+                    <input type="text" id="new-swimmer-input" placeholder="Új úszó neve">
+                    <button id="add-swimmer" class="success">+ Hozzáadás</button>
+                </div>
+                <div class="swimmer-list" id="swimmer-list">
+                    <!-- Ide kerülnek az úszók -->
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Versenyszámok kezelése</h2>
+                <div class="event-management">
+                    <input type="text" id="new-event-input" placeholder="Új versenyszám neve">
+                    <button id="add-event" class="event">+ Hozzáadás</button>
+                </div>
+                <div class="event-list" id="event-list">
+                    <!-- Ide kerülnek a versenyszámok -->
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Adatkezelés</h2>
+                <button id="clear-data" class="danger">Összes adat törlése</button>
+                <p style="font-size: 12px; margin-top: 10px; color: #666;">
+                    Figyelem: Az adatok törlése nem vonható vissza!
+                </p>
+            </div>
+        </div>
+        
+        <div class="card results-list">
+            <h2 style="text-align: center;">Eredmények</h2>
+            <div id="status" class="status">Kapcsolódás a Firebase-hoz...</div>
+            <div id="results-container">
+                <div class="loading">Adatok betöltése...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase konfiguráció
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTvbas3_caFWVc4aMN8C4KbZu7g5r6vfI",
+            authDomain: "kmkadmin-86cf5.firebaseapp.com",
+            databaseURL: "https://kmkadmin-86cf5-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "kmkadmin-86cf5",
+            storageBucket: "kmkadmin-86cf5.appspot.com",
+            messagingSenderId: "543581792942",
+            appId: "1:543581792942:web:960836303ece5d5fc09b3f",
+            measurementId: "G-7JST1C8QQN"
+        };
+
+        // Firebase inicializálása
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // Alapértelmezett versenyszámok
+        const defaultEvents = [
+            "50 m gyorsúszás",
+            "100 m gyorsúszás",
+            "200 m gyorsúszás",
+            "50 m mellúszás",
+            "100 m mellúszás",
+            "200 m mellúszás",
+            "50 m hátúszás",
+            "100 m hátúszás",
+            "200 m hátúszás",
+            "50 m pillangó",
+            "100 m pillangó",
+            "200 m pillangó",
+            "200 m vegyesúszás",
+            "400 m gyorsúszás",
+            "4x50 m gyorsváltó",
+            "4x100 m gyorsváltó"
+        ];
+        
+        // Adatok tárolása
+        let swimmers = [];
+        let events = [];
+        let placements = [];
+        
+        // DOM elemek
+        const swimmerSelect = document.getElementById('swimmer-select');
+        const eventSelect = document.getElementById('event-select');
+        const placementInput = document.getElementById('placement-input');
+        const addPlacementBtn = document.getElementById('add-placement');
+        const resultsContainer = document.getElementById('results-container');
+        const newSwimmerInput = document.getElementById('new-swimmer-input');
+        const addSwimmerBtn = document.getElementById('add-swimmer');
+        const swimmerList = document.getElementById('swimmer-list');
+        const newEventInput = document.getElementById('new-event-input');
+        const addEventBtn = document.getElementById('add-event');
+        const eventList = document.getElementById('event-list');
+        const clearDataBtn = document.getElementById('clear-data');
+        const totalSwimmersElem = document.getElementById('total-swimmers');
+        const totalPlacementsElem = document.getElementById('total-placements');
+        const statusElem = document.getElementById('status');
+        const lastUpdatedElem = document.getElementById('last-updated');
+        
+        // Utolsó frissítés időpontjának beállítása
+        function updateLastUpdated() {
+            const now = new Date();
+            lastUpdatedElem.textContent = `Utolsó frissítés: ${now.toLocaleTimeString()}`;
+        }
+        
+        // Firebase kapcsolat állapotának figyelése
+        db.enableNetwork().then(() => {
+            statusElem.textContent = "✅ Kapcsolódva a Firebase-hoz";
+            statusElem.className = "status connected";
+        }).catch((error) => {
+            statusElem.textContent = "❌ Hiba a kapcsolatban: " + error.message;
+            statusElem.className = "status disconnected";
+        });
+        
+        // Úszók betöltése Firestore-ból
+        function loadSwimmers() {
+            db.collection("swimmers").orderBy("name").onSnapshot((snapshot) => {
+                swimmers = [];
+                snapshot.forEach((doc) => {
+                    swimmers.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                updateSwimmerSelect();
+                updateSwimmerList();
+                updateStats();
+                updateLastUpdated();
+            }, (error) => {
+                console.error("Hiba az úszók betöltésekor: ", error);
+                statusElem.textContent = "❌ Hiba az adatok betöltésekor";
+                statusElem.className = "status disconnected";
+            });
+        }
+        
+        // Versenyszámok betöltése Firestore-ból
+        function loadEvents() {
+            db.collection("events").orderBy("name").onSnapshot((snapshot) => {
+                events = [];
+                snapshot.forEach((doc) => {
+                    events.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                // Ha nincsenek versenyszámok, akkor betöltjük az alapértelmezetteket
+                if (events.length === 0) {
+                    loadDefaultEvents();
+                } else {
+                    updateEventSelect();
+                    updateEventList();
+                }
+            }, (error) => {
+                console.error("Hiba a versenyszámok betöltésekor: ", error);
+            });
+        }
+        
+        // Alapértelmezett versenyszámok betöltése
+        function loadDefaultEvents() {
+            defaultEvents.forEach(eventName => {
+                db.collection("events").add({
+                    name: eventName,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            });
+        }
+        
+        // Helyezések betöltése Firestore-ból
+        function loadPlacements() {
+            db.collection("placements").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+                placements = [];
+                snapshot.forEach((doc) => {
+                    placements.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                updateResults();
+                updateStats();
+                updateLastUpdated();
+            }, (error) => {
+                console.error("Hiba a helyezések betöltésekor: ", error);
+                statusElem.textContent = "❌ Hiba az adatok betöltésekor";
+                statusElem.className = "status disconnected";
+            });
+        }
+        
+        // Úszók frissítése a select-ben
+        function updateSwimmerSelect() {
+            swimmerSelect.innerHTML = '<option value="">-- Válassz úszót --</option>';
+            swimmers.forEach(swimmer => {
+                const option = document.createElement('option');
+                option.value = swimmer.id;
+                option.textContent = swimmer.name;
+                swimmerSelect.appendChild(option);
+            });
+        }
+        
+        // Versenyszámok frissítése a select-ben
+        function updateEventSelect() {
+            eventSelect.innerHTML = '<option value="">-- Válassz versenyszámot --</option>';
+            events.forEach(event => {
+                const option = document.createElement('option');
+                option.value = event.id;
+                option.textContent = event.name;
+                eventSelect.appendChild(option);
+            });
+        }
+        
+        // Úszók listájának frissítése
+        function updateSwimmerList() {
+            swimmerList.innerHTML = '';
+            
+            if (swimmers.length === 0) {
+                swimmerList.innerHTML = '<div class="empty-state"><i>👤</i><p>Még nincsenek úszók</p><p>Adj hozzá úszókat a fenti űrlappal!</p></div>';
+                return;
+            }
+            
+            swimmers.forEach(swimmer => {
+                const swimmerDiv = document.createElement('div');
+                swimmerDiv.className = 'swimmer-item';
+                swimmerDiv.style.padding = '12px';
+                swimmerDiv.style.marginBottom = '8px';
+                swimmerDiv.style.border = '1px solid #eee';
+                swimmerDiv.style.borderRadius = '8px';
+                swimmerDiv.style.display = 'flex';
+                swimmerDiv.style.justifyContent = 'space-between';
+                swimmerDiv.style.alignItems = 'center';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = swimmer.name;
+                nameSpan.style.flexGrow = '1';
+                nameSpan.style.fontWeight = '500';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Törlés';
+                deleteBtn.className = 'danger';
+                deleteBtn.style.padding = '6px 12px';
+                deleteBtn.style.fontSize = '12px';
+                deleteBtn.style.width = 'auto';
+                deleteBtn.onclick = () => deleteSwimmer(swimmer.id);
+                
+                swimmerDiv.appendChild(nameSpan);
+                swimmerDiv.appendChild(deleteBtn);
+                swimmerList.appendChild(swimmerDiv);
+            });
+        }
+        
+        // Versenyszámok listájának frissítése
+        function updateEventList() {
+            eventList.innerHTML = '';
+            
+            if (events.length === 0) {
+                eventList.innerHTML = '<div class="empty-state"><i>🏊</i><p>Még nincsenek versenyszámok</p></div>';
+                return;
+            }
+            
+            events.forEach(event => {
+                const eventDiv = document.createElement('div');
+                eventDiv.className = 'swimmer-item';
+                eventDiv.style.padding = '12px';
+                eventDiv.style.marginBottom = '8px';
+                eventDiv.style.border = '1px solid #eee';
+                eventDiv.style.borderRadius = '8px';
+                eventDiv.style.display = 'flex';
+                eventDiv.style.justifyContent = 'space-between';
+                eventDiv.style.alignItems = 'center';
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.textContent = event.name;
+                nameSpan.style.flexGrow = '1';
+                nameSpan.style.fontWeight = '500';
+                
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Törlés';
+                deleteBtn.className = 'danger';
+                deleteBtn.style.padding = '6px 12px';
+                deleteBtn.style.fontSize = '12px';
+                deleteBtn.style.width = 'auto';
+                deleteBtn.onclick = () => deleteEvent(event.id);
+                
+                eventDiv.appendChild(nameSpan);
+                eventDiv.appendChild(deleteBtn);
+                eventList.appendChild(eventDiv);
+            });
+        }
+        
+        // Új úszó hozzáadása
+        function addNewSwimmer() {
+            const newSwimmerName = newSwimmerInput.value.trim();
+            
+            if (!newSwimmerName) {
+                alert('Kérjük, add meg az új úszó nevét!');
+                return;
+            }
+            
+            // Ellenőrzés, hogy létezik-e már ilyen név
+            const existingSwimmer = swimmers.find(s => s.name.toLowerCase() === newSwimmerName.toLowerCase());
+            if (existingSwimmer) {
+                alert('Ez az úszó már szerepel a listában!');
+                return;
+            }
+            
+            // Új úszó hozzáadása Firestore-hoz
+            db.collection("swimmers").add({
+                name: newSwimmerName,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                newSwimmerInput.value = '';
+                console.log("Új úszó hozzáadva: ", newSwimmerName);
+            }).catch((error) => {
+                console.error("Hiba az úszó hozzáadásakor: ", error);
+                alert("Hiba történt az úszó hozzáadása során.");
+            });
+        }
+        
+        // Új versenyszám hozzáadása
+        function addNewEvent() {
+            const newEventName = newEventInput.value.trim();
+            
+            if (!newEventName) {
+                alert('Kérjük, add meg az új versenyszám nevét!');
+                return;
+            }
+            
+            // Ellenőrzés, hogy létezik-e már ilyen név
+            const existingEvent = events.find(e => e.name.toLowerCase() === newEventName.toLowerCase());
+            if (existingEvent) {
+                alert('Ez a versenyszám már szerepel a listában!');
+                return;
+            }
+            
+            // Új versenyszám hozzáadása Firestore-hoz
+            db.collection("events").add({
+                name: newEventName,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                newEventInput.value = '';
+                console.log("Új versenyszám hozzáadva: ", newEventName);
+            }).catch((error) => {
+                console.error("Hiba a versenyszám hozzáadásakor: ", error);
+                alert("Hiba történt a versenyszám hozzáadása során.");
+            });
+        }
+        
+        // Úszó törlése
+        function deleteSwimmer(swimmerId) {
+            if (!confirm('Biztosan törölni szeretnéd ezt az úszót? A hozzá tartozó helyezések is törlődnek!')) {
+                return;
+            }
+            
+            // Először töröljük a hozzá tartozó helyezéseket
+            const deletePlacements = db.collection("placements")
+                .where("swimmerId", "==", swimmerId)
+                .get()
+                .then((snapshot) => {
+                    const batch = db.batch();
+                    snapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    return batch.commit();
+                });
+            
+            // Majd töröljük magát az úszót
+            deletePlacements.then(() => {
+                return db.collection("swimmers").doc(swimmerId).delete();
+            }).then(() => {
+                console.log("Úszó és helyezései törölve");
+            }).catch((error) => {
+                console.error("Hiba a törlés során: ", error);
+                alert("Hiba történt a törlés során.");
+            });
+        }
+        
+        // Versenyszám törlése
+        function deleteEvent(eventId) {
+            if (!confirm('Biztosan törölni szeretnéd ezt a versenyszámot? A hozzá tartozó helyezések is törlődnek!')) {
+                return;
+            }
+            
+            // Először töröljük a hozzá tartozó helyezéseket
+            const deletePlacements = db.collection("placements")
+                .where("eventId", "==", eventId)
+                .get()
+                .then((snapshot) => {
+                    const batch = db.batch();
+                    snapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    return batch.commit();
+                });
+            
+            // Majd töröljük magát a versenyszámot
+            deletePlacements.then(() => {
+                return db.collection("events").doc(eventId).delete();
+            }).then(() => {
+                console.log("Versenyszám és helyezései törölve");
+            }).catch((error) => {
+                console.error("Hiba a törlés során: ", error);
+                alert("Hiba történt a törlés során.");
+            });
+        }
+        
+        // Helyezés hozzáadása
+        function addPlacement() {
+            const selectedSwimmerId = swimmerSelect.value;
+            const selectedEventId = eventSelect.value;
+            const placementValue = parseInt(placementInput.value);
+            
+            if (!selectedSwimmerId) {
+                alert('Kérjük, válassz úszót!');
+                return;
+            }
+            
+            if (!selectedEventId) {
+                alert('Kérjük, válassz versenyszámot!');
+                return;
+            }
+            
+            if (isNaN(placementValue) || placementValue < 1 || placementValue > 20) {
+                alert('Kérjük, adj meg egy érvényes helyezést (1-20)!');
+                return;
+            }
+            
+            const selectedSwimmer = swimmers.find(s => s.id === selectedSwimmerId);
+            const selectedEvent = events.find(e => e.id === selectedEventId);
+            
+            // Új helyezés hozzáadása Firestore-hoz
+            db.collection("placements").add({
+                swimmerId: selectedSwimmerId,
+                swimmerName: selectedSwimmer.name,
+                eventId: selectedEventId,
+                eventName: selectedEvent.name,
+                placement: placementValue,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            }).then(() => {
+                placementInput.value = '';
+                console.log("Helyezés hozzáadva: ", selectedSwimmer.name, selectedEvent.name, placementValue);
+            }).catch((error) => {
+                console.error("Hiba a helyezés hozzáadásakor: ", error);
+                alert("Hiba történt a helyezés rögzítése során.");
+            });
+        }
+        
+        // Helyezés törlése
+        function deletePlacement(placementId) {
+            if (!confirm('Biztosan törölni szeretnéd ezt a helyezést?')) {
+                return;
+            }
+            
+            db.collection("placements").doc(placementId).delete()
+                .then(() => {
+                    console.log("Helyezés törölve");
+                })
+                .catch((error) => {
+                    console.error("Hiba a helyezés törlésekor: ", error);
+                    alert("Hiba történt a helyezés törlése során.");
+                });
+        }
+        
+        // Eredmények frissítése
+        function updateResults() {
+            // Csoportosítás úszónként
+            const groupedPlacements = {};
+            
+            placements.forEach(placement => {
+                if (!groupedPlacements[placement.swimmerId]) {
+                    groupedPlacements[placement.swimmerId] = {
+                        name: placement.swimmerName,
+                        events: {}
+                    };
+                }
+                
+                if (!groupedPlacements[placement.swimmerId].events[placement.eventId]) {
+                    groupedPlacements[placement.swimmerId].events[placement.eventId] = {
+                        name: placement.eventName,
+                        placements: []
+                    };
+                }
+                
+                groupedPlacements[placement.swimmerId].events[placement.eventId].placements.push(placement);
+            });
+            
+            // Rendezés: először a legjobb helyezés, majd név szerint
+            const sortedSwimmerIds = Object.keys(groupedPlacements).sort((a, b) => {
+                // Az összes helyezésből a legjobbak kiválasztása
+                const allPlacementsA = Object.values(groupedPlacements[a].events)
+                    .flatMap(event => event.placements.map(p => p.placement));
+                const allPlacementsB = Object.values(groupedPlacements[b].events)
+                    .flatMap(event => event.placements.map(p => p.placement));
+                
+                const bestA = Math.min(...allPlacementsA);
+                const bestB = Math.min(...allPlacementsB);
+                
+                if (bestA !== bestB) {
+                    return bestA - bestB;
+                }
+                
+                return groupedPlacements[a].name.localeCompare(groupedPlacements[b].name);
+            });
+            
+            // Eredmények megjelenítése
+            resultsContainer.innerHTML = '';
+            
+            if (sortedSwimmerIds.length === 0) {
+                resultsContainer.innerHTML = '<div class="empty-state"><i>🏊</i><p>Még nincsenek eredmények</p><p>Add meg az első helyezést!</p></div>';
+                return;
+            }
+            
+            sortedSwimmerIds.forEach(swimmerId => {
+                const swimmerData = groupedPlacements[swimmerId];
+                const swimmerDiv = document.createElement('div');
+                swimmerDiv.className = 'swimmer-item';
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'swimmer-name';
+                nameDiv.textContent = swimmerData.name;
+                swimmerDiv.appendChild(nameDiv);
+                
+                // Versenyszámok csoportosítása
+                Object.values(swimmerData.events).forEach(eventData => {
+                    const eventGroup = document.createElement('div');
+                    eventGroup.className = 'event-group';
+                    
+                    const eventNameDiv = document.createElement('div');
+                    eventNameDiv.className = 'event-name';
+                    eventNameDiv.textContent = eventData.name;
+                    eventGroup.appendChild(eventNameDiv);
+                    
+                    const placementsDiv = document.createElement('div');
+                    placementsDiv.className = 'placement-list';
+                    
+                    // Helyezések rendezése
+                    const eventPlacements = eventData.placements
+                        .sort((a, b) => a.placement - b.placement);
+                    
+                    eventPlacements.forEach(placement => {
+                        const placementDiv = document.createElement('div');
+                        placementDiv.className = 'placement-item';
+                        
+                        const medalDiv = document.createElement('div');
+                        medalDiv.className = 'medal';
+                        
+                        if (placement.placement === 1) {
+                            medalDiv.classList.add('gold');
+                        } else if (placement.placement === 2) {
+                            medalDiv.classList.add('silver');
+                        } else if (placement.placement === 3) {
+                            medalDiv.classList.add('bronze');
+                        } else {
+                            medalDiv.classList.add('other');
+                        }
+                        
+                        const placementText = document.createElement('span');
+                        placementText.className = 'placement-text';
+                        placementText.textContent = `${placement.placement}. helyezés`;
+                        
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.className = 'delete-placement';
+                        deleteBtn.innerHTML = '🗑️';
+                        deleteBtn.title = 'Helyezés törlése';
+                        deleteBtn.onclick = () => deletePlacement(placement.id);
+                        
+                        placementDiv.appendChild(medalDiv);
+                        placementDiv.appendChild(placementText);
+                        placementDiv.appendChild(deleteBtn);
+                        placementsDiv.appendChild(placementDiv);
+                    });
+                    
+                    eventGroup.appendChild(placementsDiv);
+                    swimmerDiv.appendChild(eventGroup);
+                });
+                
+                resultsContainer.appendChild(swimmerDiv);
+            });
+        }
+        
+        // Statisztikák frissítése
+        function updateStats() {
+            totalSwimmersElem.textContent = swimmers.length;
+            totalPlacementsElem.textContent = placements.length;
+        }
+        
+        // Összes adat törlése
+        function clearAllData() {
+            if (!confirm('Biztosan törölni szeretnéd az ÖSSZES adatot? Ez a művelet NEM vonható vissza!')) {
+                return;
+            }
+            
+            // Töröljük az összes helyezést
+            const deletePlacements = db.collection("placements").get()
+                .then((snapshot) => {
+                    const batch = db.batch();
+                    snapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    return batch.commit();
+                });
+            
+            // Töröljük az összes úszót
+            const deleteSwimmers = db.collection("swimmers").get()
+                .then((snapshot) => {
+                    const batch = db.batch();
+                    snapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    return batch.commit();
+                });
+                
+            // Töröljük az összes versenyszámot
+            const deleteEvents = db.collection("events").get()
+                .then((snapshot) => {
+                    const batch = db.batch();
+                    snapshot.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    return batch.commit();
+                });
+            
+            // Várakozás mindkét művelet befejezésére
+            Promise.all([deletePlacements, deleteSwimmers, deleteEvents])
+                .then(() => {
+                    alert('Minden adat törölve!');
+                })
+                .catch((error) => {
+                    console.error("Hiba az adatok törlése során: ", error);
+                    alert("Hiba történt az adatok törlése során.");
+                });
+        }
+        
+        // Eseménykezelők
+        addPlacementBtn.addEventListener('click', addPlacement);
+        addSwimmerBtn.addEventListener('click', addNewSwimmer);
+        addEventBtn.addEventListener('click', addNewEvent);
+        clearDataBtn.addEventListener('click', clearAllData);
+        
+        // Enter billentyű használata az input mezőkben
+        placementInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addPlacement();
+            }
+        });
+        
+        newSwimmerInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addNewSwimmer();
+            }
+        });
+        
+        newEventInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addNewEvent();
+            }
+        });
+        
+        // Inicializálás
+        loadSwimmers();
+        loadEvents();
+        loadPlacements();
+        
+        // Automatikus frissítés az idő múlásával
+        setInterval(updateLastUpdated, 60000); // 1 percenként
+    </script>
+</body>
+</html>
