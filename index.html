@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Úszóverseny Eredmények - Élő Követés</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <style>
+        :root {
+            --gold: #FFD700;
+            --silver: #C0C0C0;
+            --bronze: #CD7F32;
+            --background: #1a1a2e;
+            --card-bg: #16213e;
+            --text: #ffffff;
+            --accent: #0fccce;
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --event: #e94560;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            color: var(--text);
+            line-height: 1.6;
+            padding: 0;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .header {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            position: relative;
+            z-index: 10;
+        }
+        
+        .logo {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: var(--accent);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .logo::before {
+            content: "🏆";
+            margin-right: 15px;
+            font-size: 3rem;
+            filter: drop-shadow(0 0 10px var(--accent));
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            color: #cccccc;
+            margin-bottom: 15px;
+        }
+        
+        .live-indicator {
+            display: inline-flex;
+            align-items: center;
+            background: var(--success);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        
+        .live-indicator::before {
+            content: "";
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background: white;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: blink 1.5s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0.3; }
+        }
+        
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(15, 204, 206, 0.1);
+            padding: 15px;
+            margin: 20px auto;
+            max-width: 1200px;
+            border-radius: 10px;
+            border: 1px solid rgba(15, 204, 206, 0.3);
+        }
+        
+        .stat-item {
+            text-align: center;
+            padding: 10px;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: var(--accent);
+            text-shadow: 0 0 10px rgba(15, 204, 206, 0.5);
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #cccccc;
+            margin-top: 5px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        
+        @media (min-width: 768px) {
+            .container {
+                grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            }
+        }
+        
+        .swimmer-card {
+            background: linear-gradient(145deg, #16213e 0%, #1a1a2e 100%);
+            border-radius: 15px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5);
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(15, 204, 206, 0.2);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .swimmer-card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--accent), var(--event));
+        }
+        
+        .swimmer-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.7);
+            border-color: rgba(15, 204, 206, 0.5);
+        }
+        
+        .swimmer-name {
+            font-weight: bold;
+            font-size: 1.5rem;
+            margin-bottom: 15px;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            text-shadow: 0 0 10px rgba(15, 204, 206, 0.3);
+        }
+        
+        .swimmer-name::before {
+            content: "🏊";
+            margin-right: 10px;
+            font-size: 1.8rem;
+        }
+        
+        .event-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(233, 69, 96, 0.1);
+            border-radius: 10px;
+            border-left: 4px solid var(--event);
+        }
+        
+        .event-name {
+            font-weight: bold;
+            color: var(--event);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            font-size: 1.1rem;
+        }
+        
+        .event-name::before {
+            content: "🏅";
+            margin-right: 8px;
+        }
+        
+        .placement-list {
+            margin-left: 10px;
+        }
+        
+        .placement-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+        
+        .placement-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+        
+        .medal {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            flex-shrink: 0;
+            position: relative;
+        }
+        
+        .medal::after {
+            content: "";
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            right: 3px;
+            bottom: 3px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8) 0%, rgba(255,255,255,0) 70%);
+        }
+        
+        .gold {
+            background: linear-gradient(135deg, var(--gold) 0%, #ffec8b 100%);
+            box-shadow: 0 0 15px var(--gold);
+        }
+        
+        .silver {
+            background: linear-gradient(135deg, var(--silver) 0%, #e8e8e8 100%);
+            box-shadow: 0 0 15px var(--silver);
+        }
+        
+        .bronze {
+            background: linear-gradient(135deg, var(--bronze) 0%, #e9b376 100%);
+            box-shadow: 0 0 15px var(--bronze);
+        }
+        
+        .other {
+            background: linear-gradient(135deg, #4a5568 0%, #718096 100%);
+        }
+        
+        .placement-text {
+            font-size: 1rem;
+            font-weight: 500;
+            flex-grow: 1;
+        }
+        
+        .last-updated {
+            text-align: center;
+            color: #cccccc;
+            font-size: 0.9rem;
+            margin-top: 20px;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            max-width: 1200px;
+            margin: 20px auto;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #cccccc;
+        }
+        
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 20px;
+            display: block;
+            color: #4a5568;
+        }
+        
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 10px;
+            color: var(--accent);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: #cccccc;
+            font-size: 1.2rem;
+        }
+        
+        .loading::after {
+            content: "";
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        
+        @keyframes dots {
+            0%, 20% { content: "."; }
+            40% { content: ".."; }
+            60%, 100% { content: "..."; }
+        }
+        
+        /* Görgetősáv stílusok */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1a1a2e;
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 10px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0da8aa;
+        }
+        
+        /* Animáció az új eredményekhez */
+        @keyframes highlight {
+            0% { background-color: rgba(15, 204, 206, 0.3); }
+            100% { background-color: transparent; }
+        }
+        
+        .new-result {
+            animation: highlight 2s ease;
+        }
+        
+        /* Fullscreen támogatás */
+        .fullscreen-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+        
+        .fullscreen-btn:hover {
+            background: #0da8aa;
+            transform: scale(1.1);
+        }
+        
+        /* Képernyőforgatás figyelmeztetés */
+        @media (max-width: 768px) and (orientation: portrait) {
+            .orientation-warning {
+                display: block;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.9);
+                z-index: 1000;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                color: white;
+                text-align: center;
+                padding: 20px;
+            }
+            
+            .orientation-warning i {
+                font-size: 3rem;
+                margin-bottom: 20px;
+                color: var(--accent);
+            }
+        }
+        
+        .orientation-warning {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">Úszóverseny Eredmények</div>
+        <div class="subtitle">2024 Országos Bajnokság</div>
+        <div class="live-indicator">ÉLŐ KÖVETÉS</div>
+    </div>
+    
+    <div class="stats-bar">
+        <div class="stat-item">
+            <div class="stat-value" id="total-swimmers">0</div>
+            <div class="stat-label">Versenyző</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="total-placements">0</div>
+            <div class="stat-label">Helyezés</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-value" id="total-events">0</div>
+            <div class="stat-label">Versenyszám</div>
+        </div>
+    </div>
+    
+    <div class="container" id="results-container">
+        <div class="loading">Eredmények betöltése</div>
+    </div>
+    
+    <div class="last-updated" id="last-updated">
+        Utolsó frissítés: -
+    </div>
+    
+    <button class="fullscreen-btn" id="fullscreen-btn" title="Teljes képernyő">⛶</button>
+    
+    <div class="orientation-warning" id="orientation-warning">
+        <i>🔄</i>
+        <h3>Forgasd el a készüléked</h3>
+        <p>A legjobb megjelenítés érdekében használd fekvő tájolásban</p>
+    </div>
+
+    <script>
+        // Firebase konfiguráció
+        const firebaseConfig = {
+            apiKey: "AIzaSyDTvbas3_caFWVc4aMN8C4KbZu7g5r6vfI",
+            authDomain: "kmkadmin-86cf5.firebaseapp.com",
+            databaseURL: "https://kmkadmin-86cf5-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "kmkadmin-86cf5",
+            storageBucket: "kmkadmin-86cf5.appspot.com",
+            messagingSenderId: "543581792942",
+            appId: "1:543581792942:web:960836303ece5d5fc09b3f",
+            measurementId: "G-7JST1C8QQN"
+        };
+
+        // Firebase inicializálása
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        
+        // Adatok tárolása
+        let swimmers = [];
+        let events = [];
+        let placements = [];
+        let lastUpdateTime = null;
+        
+        // DOM elemek
+        const resultsContainer = document.getElementById('results-container');
+        const totalSwimmersElem = document.getElementById('total-swimmers');
+        const totalPlacementsElem = document.getElementById('total-placements');
+        const totalEventsElem = document.getElementById('total-events');
+        const lastUpdatedElem = document.getElementById('last-updated');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        const orientationWarning = document.getElementById('orientation-warning');
+        
+        // Utolsó frissítés időpontjának beállítása
+        function updateLastUpdated() {
+            const now = new Date();
+            lastUpdateTime = now;
+            lastUpdatedElem.textContent = `Utolsó frissítés: ${now.toLocaleTimeString()}`;
+        }
+        
+        // Teljes képernyő funkció
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.log(`Fullscreen hiba: ${err.message}`);
+                });
+            } else {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen();
+                }
+            }
+        }
+        
+        // Képernyő tájolás ellenőrzése
+        function checkOrientation() {
+            if (window.innerHeight > window.innerWidth && window.innerWidth < 768) {
+                orientationWarning.style.display = 'flex';
+            } else {
+                orientationWarning.style.display = 'none';
+            }
+        }
+        
+        // Úszók betöltése Firestore-ból
+        function loadSwimmers() {
+            db.collection("swimmers").orderBy("name").onSnapshot((snapshot) => {
+                swimmers = [];
+                snapshot.forEach((doc) => {
+                    swimmers.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                updateStats();
+                updateLastUpdated();
+            }, (error) => {
+                console.error("Hiba az úszók betöltésekor: ", error);
+            });
+        }
+        
+        // Versenyszámok betöltése Firestore-ból
+        function loadEvents() {
+            db.collection("events").orderBy("name").onSnapshot((snapshot) => {
+                events = [];
+                snapshot.forEach((doc) => {
+                    events.push({
+                        id: doc.id,
+                        ...doc.data()
+                    });
+                });
+                
+                updateStats();
+            }, (error) => {
+                console.error("Hiba a versenyszámok betöltésekor: ", error);
+            });
+        }
+        
+        // Helyezések betöltése Firestore-ból
+        function loadPlacements() {
+            db.collection("placements").orderBy("timestamp", "desc").onSnapshot((snapshot) => {
+                placements = [];
+                snapshot.forEach((doc) => {
+                    placements.push({
+                        id: doc.id,
+                        ...doc.data(),
+                        isNew: lastUpdateTime && doc.data().timestamp?.toDate() > lastUpdateTime
+                    });
+                });
+                
+                updateResults();
+                updateStats();
+                updateLastUpdated();
+            }, (error) => {
+                console.error("Hiba a helyezések betöltésekor: ", error);
+            });
+        }
+        
+        // Eredmények frissítése
+        function updateResults() {
+            // Csoportosítás úszónként
+            const groupedPlacements = {};
+            
+            placements.forEach(placement => {
+                if (!groupedPlacements[placement.swimmerId]) {
+                    groupedPlacements[placement.swimmerId] = {
+                        name: placement.swimmerName,
+                        events: {}
+                    };
+                }
+                
+                if (!groupedPlacements[placement.swimmerId].events[placement.eventId]) {
+                    groupedPlacements[placement.swimmerId].events[placement.eventId] = {
+                        name: placement.eventName,
+                        placements: []
+                    };
+                }
+                
+                groupedPlacements[placement.swimmerId].events[placement.eventId].placements.push(placement);
+            });
+            
+            // Rendezés: először a legjobb helyezés, majd név szerint
+            const sortedSwimmerIds = Object.keys(groupedPlacements).sort((a, b) => {
+                // Az összes helyezésből a legjobbak kiválasztása
+                const allPlacementsA = Object.values(groupedPlacements[a].events)
+                    .flatMap(event => event.placements.map(p => p.placement));
+                const allPlacementsB = Object.values(groupedPlacements[b].events)
+                    .flatMap(event => event.placements.map(p => p.placement));
+                
+                if (allPlacementsA.length === 0) return 1;
+                if (allPlacementsB.length === 0) return -1;
+                
+                const bestA = Math.min(...allPlacementsA);
+                const bestB = Math.min(...allPlacementsB);
+                
+                if (bestA !== bestB) {
+                    return bestA - bestB;
+                }
+                
+                return groupedPlacements[a].name.localeCompare(groupedPlacements[b].name);
+            });
+            
+            // Eredmények megjelenítése
+            resultsContainer.innerHTML = '';
+            
+            if (sortedSwimmerIds.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="empty-state">
+                        <i>🏊</i>
+                        <h3>Még nincsenek eredmények</h3>
+                        <p>Az eredmények itt fognak megjelenni, amint rögzítik őket</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            sortedSwimmerIds.forEach(swimmerId => {
+                const swimmerData = groupedPlacements[swimmerId];
+                const swimmerCard = document.createElement('div');
+                swimmerCard.className = 'swimmer-card';
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'swimmer-name';
+                nameDiv.textContent = swimmerData.name;
+                swimmerCard.appendChild(nameDiv);
+                
+                // Versenyszámok csoportosítása
+                Object.values(swimmerData.events).forEach(eventData => {
+                    const eventGroup = document.createElement('div');
+                    eventGroup.className = 'event-group';
+                    
+                    const eventNameDiv = document.createElement('div');
+                    eventNameDiv.className = 'event-name';
+                    eventNameDiv.textContent = eventData.name;
+                    eventGroup.appendChild(eventNameDiv);
+                    
+                    const placementsDiv = document.createElement('div');
+                    placementsDiv.className = 'placement-list';
+                    
+                    // Helyezések rendezése
+                    const eventPlacements = eventData.placements
+                        .sort((a, b) => a.placement - b.placement);
+                    
+                    eventPlacements.forEach(placement => {
+                        const placementItem = document.createElement('div');
+                        placementItem.className = 'placement-item';
+                        if (placement.isNew) {
+                            placementItem.classList.add('new-result');
+                        }
+                        
+                        const medalDiv = document.createElement('div');
+                        medalDiv.className = 'medal';
+                        
+                        if (placement.placement === 1) {
+                            medalDiv.classList.add('gold');
+                        } else if (placement.placement === 2) {
+                            medalDiv.classList.add('silver');
+                        } else if (placement.placement === 3) {
+                            medalDiv.classList.add('bronze');
+                        } else {
+                            medalDiv.classList.add('other');
+                        }
+                        
+                        const placementText = document.createElement('span');
+                        placementText.className = 'placement-text';
+                        placementText.textContent = `${placement.placement}. helyezés`;
+                        
+                        placementItem.appendChild(medalDiv);
+                        placementItem.appendChild(placementText);
+                        placementsDiv.appendChild(placementItem);
+                    });
+                    
+                    eventGroup.appendChild(placementsDiv);
+                    swimmerCard.appendChild(eventGroup);
+                });
+                
+                resultsContainer.appendChild(swimmerCard);
+            });
+        }
+        
+        // Statisztikák frissítése
+        function updateStats() {
+            totalSwimmersElem.textContent = swimmers.length;
+            totalPlacementsElem.textContent = placements.length;
+            totalEventsElem.textContent = events.length;
+        }
+        
+        // Eseménykezelők
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+        window.addEventListener('resize', checkOrientation);
+        window.addEventListener('orientationchange', checkOrientation);
+        
+        // Automatikus frissítés
+        function startAutoRefresh() {
+            // Frissítés minden 10 másodpercben
+            setInterval(updateLastUpdated, 10000);
+            
+            // Teljes oldal frissítése ritkábban (percenként)
+            setInterval(() => {
+                // A Firebase real-time update miatt ez nem szükséges,
+                // de itt lehetne további logikát implementálni
+            }, 60000);
+        }
+        
+        // Inicializálás
+        loadSwimmers();
+        loadEvents();
+        loadPlacements();
+        checkOrientation();
+        startAutoRefresh();
+        
+        // Oldal betöltésekor
+        document.addEventListener('DOMContentLoaded', function() {
+            // Automatikus scroll az új eredményekhez
+            const observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(mutation) {
+                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                        // Új elemek lettek hozzáadva, lehet scrollozni
+                        setTimeout(() => {
+                            window.scrollTo({
+                                top: 0,
+                                behavior: 'smooth'
+                            });
+                        }, 500);
+                    }
+                });
+            });
+            
+            observer.observe(resultsContainer, {
+                childList: true,
+                subtree: true
+            });
+        });
+    </script>
+</body>
+</html>
